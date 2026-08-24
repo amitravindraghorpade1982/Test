@@ -1,1 +1,124 @@
+Yes. I strongly recommend adding a short “Architecture Principles / Key Design Decisions” section immediately after this diagram.
 
+The diagram explains what the components are, but an architecture review board will ask why these components are there, what happens to Oracle, and how the design handles reliability, security and transaction dependencies.
+
+I would not add a long explanation. Keep it to one slide with 6–8 strong points.
+
+Recommended slide after this architecture
+
+Architecture Design Principles & Key Decisions
+
+1. Oracle decoupling
+
+Oracle is removed from the high-volume logging and historical-data persistence path.
+
+Business transactions that genuinely require transactional DB lookups must be assessed separately before complete Oracle retirement.
+
+
+2. IBM MQ → Kafka decoupling
+
+IBM MQ remains the enterprise messaging entry point.
+
+Kafka provides a scalable buffer, replay capability and multiple-consumer model for downstream processing.
+
+
+3. On-premises object storage
+
+Transaction/logging payloads are stored in SBI-controlled on-premises object storage using an S3-compatible API.
+
+No public-cloud dependency.
+
+
+4. Iceberg + Parquet
+
+Parquet is the physical columnar data-file format.
+
+Apache Iceberg provides the table/metadata layer, including ACID commits, schema evolution and partition management.
+
+Iceberg is not another physical storage system.
+
+
+5. Scalable analytics
+
+Trino/Spark can query the same historical data without placing analytical workload on an OLTP database.
+
+Analytics and AI workloads are therefore isolated from transaction processing.
+
+
+6. High-volume protection
+
+Kafka provides buffering when downstream storage/processing is temporarily slower than the incoming event rate.
+
+Consumer throttling and controlled batching prevent excessive downstream database/storage concurrency.
+
+
+7. Data retention strategy
+
+Short-term operational data can remain in the appropriate operational store where required.
+
+Large historical payloads are progressively retained in object storage rather than expensive transactional database storage.
+
+
+8. Security & governance
+
+All components remain within SBI-controlled data centres.
+
+Access control, encryption, audit, retention and DR policies must comply with SBI security standards.
+
+
+
+---
+
+But I would make one important change to your current diagram
+
+Your current end-to-end flow says:
+
+> Kafka → Object Storage → Iceberg → Parquet
+
+
+
+This can make an architect think that these are four sequential storage steps.
+
+That's not technically the best representation.
+
+The better wording is:
+
+> Kafka → On-Prem Object Storage (Parquet files) ← managed by Apache Iceberg → Trino/Spark
+
+
+
+So on the slide, I would describe it as:
+
+On-Prem Object Storage
+Physical storage for Parquet files
+
+Apache Iceberg
+Table & metadata management layer over those files
+
+Then:
+
+Trino / Spark → Analytics / AI
+
+One more point I would definitely add
+
+Because you previously mentioned DigiLocker and Supervisory Override, don't claim that this architecture automatically eliminates all Oracle dependency.
+
+Use this wording:
+
+> “Oracle removal from the high-volume logging persistence path; remaining business-critical DB-dependent services will be evaluated separately for alternative transactional persistence.”
+
+
+
+That is much more defensible in front of a Senior Architect / SBI Architecture Review Board than simply saying “Oracle Removed.”
+
+In fact, if this is your 2-week recommendation, I would label the slide:
+
+Target-State Direction — Oracle Decoupling & Data-Lake Architecture
+
+rather than presenting complete Oracle elimination as something that can be delivered in two weeks.
+
+Two-week scope: MQ/Kafka buffering, batching, logging decoupling, object-storage/Iceberg PoC/design, and workload validation.
+
+Long-term scope: migration of genuine Oracle-dependent business transactions to an appropriate transactional database/platform.
+
+That distinction will make your architecture much harder to challenge.
